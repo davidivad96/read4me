@@ -10,13 +10,13 @@ const snsClient = new SNSClient({ region: process.env.CDK_DEPLOY_REGION });
 const sqsClient = new SQSClient({ region: process.env.CDK_DEPLOY_REGION });
 
 const handler = async (event) => {
-  const bucketName = event.detail.bucket.name;
-  const objectKey = event.detail.object.key;
+  const bucketName = event.bucket.name;
+  const objectKey = event.object.key;
   const filename = objectKey
     .replace("documents/", "")
     .toLowerCase()
     .replace(/[^a-zA-Z\d]/g, "_");
-  const topicAndQueueName = `AmazonTextractJob_${Date.now()}`;
+  const topicAndQueueName = `ReadformeJob_${Date.now()}`;
   // Create a topic
   const createTopicCommand = new CreateTopicCommand({
     Name: topicAndQueueName,

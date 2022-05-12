@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 if [[ $# -ge 2 ]]; then
+    export AWS_PROFILE=readforme
     export CDK_DEPLOY_ACCOUNT=$1
     export CDK_DEPLOY_REGION=$2
     shift; shift

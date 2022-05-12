@@ -13,8 +13,8 @@ export class ReadformeStack extends Stack {
 
     /** ------------------ Bucket Definition ------------------ */
 
-    const uuid = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-    const bucketName = `readforme-${uuid}`;
+    const random = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    const bucketName = `readforme-${random}`;
     const s3Bucket = new s3.Bucket(this, bucketName, {
       bucketName,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
@@ -36,8 +36,8 @@ export class ReadformeStack extends Stack {
             "sqs:SetQueueAttributes",
           ],
           resources: [
-            `arn:aws:sns:*:${process.env.CDK_DEPLOY_ACCOUNT}:AmazonTextractJob_*`,
-            `arn:aws:sqs:*:${process.env.CDK_DEPLOY_ACCOUNT}:AmazonTextractJob_*`,
+            `arn:aws:sns:*:${process.env.CDK_DEPLOY_ACCOUNT}:ReadformeJob_*`,
+            `arn:aws:sqs:*:${process.env.CDK_DEPLOY_ACCOUNT}:ReadformeJob_*`,
           ],
         }),
       ],
@@ -54,9 +54,19 @@ export class ReadformeStack extends Stack {
           effect: iam.Effect.ALLOW,
           actions: ["sns:DeleteTopic", "sqs:DeleteQueue"],
           resources: [
-            `arn:aws:sns:*:${process.env.CDK_DEPLOY_ACCOUNT}:AmazonTextractJob_*`,
-            `arn:aws:sqs:*:${process.env.CDK_DEPLOY_ACCOUNT}:AmazonTextractJob_*`,
+            `arn:aws:sns:*:${process.env.CDK_DEPLOY_ACCOUNT}:ReadformeJob_*`,
+            `arn:aws:sqs:*:${process.env.CDK_DEPLOY_ACCOUNT}:ReadformeJob_*`,
           ],
+        }),
+      ],
+    });
+
+    const SNSPublishPolicy = new iam.ManagedPolicy(this, "SNSPublishPolicy", {
+      statements: [
+        new iam.PolicyStatement({
+          effect: iam.Effect.ALLOW,
+          actions: ["sns:Publish"],
+          resources: [`arn:aws:sns:*:${process.env.CDK_DEPLOY_ACCOUNT}:ReadformeJob_*`],
         }),
       ],
     });
@@ -80,9 +90,29 @@ export class ReadformeStack extends Stack {
       }
     );
 
+    const SQSReceiveTextractJobMessagePolicy = new iam.ManagedPolicy(this, "SQSReceiveTextractJobMessagePolicy", {
+      statements: [
+        new iam.PolicyStatement({
+          effect: iam.Effect.ALLOW,
+          actions: ["sqs:ReceiveMessage"],
+          resources: [`arn:aws:sqs:*:${process.env.CDK_DEPLOY_ACCOUNT}:ReadformeJob_*`],
+        }),
+      ],
+    });
+
+    const SQSDeleteTextractJobMessagePolicy = new iam.ManagedPolicy(this, "SQSDeleteTextractJobMessagePolicy", {
+      statements: [
+        new iam.PolicyStatement({
+          effect: iam.Effect.ALLOW,
+          actions: ["sqs:DeleteMessage"],
+          resources: [`arn:aws:sqs:*:${process.env.CDK_DEPLOY_ACCOUNT}:ReadformeJob_*`],
+        }),
+      ],
+    });
+
     const textractSNSPublishRole = new iam.Role(this, "TextractSNSPublishRole", {
       assumedBy: new iam.ServicePrincipal("textract.amazonaws.com"),
-      managedPolicies: [iam.ManagedPolicy.fromAwsManagedPolicyName("service-role/AmazonTextractServiceRole")],
+      managedPolicies: [SNSPublishPolicy],
       roleName: "TextractSNSPublishRole",
     });
 
@@ -111,6 +141,24 @@ export class ReadformeStack extends Stack {
         textractStartDocumentTextDetectionPolicy,
       ],
       roleName: "StartDocumentTextDetectionLambdaRole",
+    });
+
+    const receiveTextractJobMessageLambdaRole = new iam.Role(this, "ReceiveTextractJobMessageLambdaRole", {
+      assumedBy: new iam.ServicePrincipal("lambda.amazonaws.com"),
+      managedPolicies: [
+        iam.ManagedPolicy.fromAwsManagedPolicyName("service-role/AWSLambdaBasicExecutionRole"),
+        SQSReceiveTextractJobMessagePolicy,
+      ],
+      roleName: "ReceiveTextractJobMessageLambdaRole",
+    });
+
+    const deleteTextractJobMessageLambdaRole = new iam.Role(this, "DeleteTextractJobMessageLambdaRole", {
+      assumedBy: new iam.ServicePrincipal("lambda.amazonaws.com"),
+      managedPolicies: [
+        iam.ManagedPolicy.fromAwsManagedPolicyName("service-role/AWSLambdaBasicExecutionRole"),
+        SQSDeleteTextractJobMessagePolicy,
+      ],
+      roleName: "DeleteTextractJobMessageLambdaRole",
     });
 
     /** ------------------ Lambda Handlers Definition ------------------ */
@@ -142,6 +190,27 @@ export class ReadformeStack extends Stack {
       },
     });
 
+    const receiveTextractJobMessageLambda = new lambda.Function(this, "ReceiveTextractJobMessage", {
+      runtime: lambda.Runtime.NODEJS_14_X,
+      code: lambda.Code.fromAsset(join(__dirname, "../lambdas/receiveTextractJobMessage")),
+      handler: "index.handler",
+      role: receiveTextractJobMessageLambdaRole,
+      timeout: Duration.seconds(30),
+      environment: {
+        CDK_DEPLOY_REGION: process.env.CDK_DEPLOY_REGION || "us-east-1",
+      },
+    });
+
+    const deleteTextractJobMessageLambda = new lambda.Function(this, "DeleteTextractJobMessage", {
+      runtime: lambda.Runtime.NODEJS_14_X,
+      code: lambda.Code.fromAsset(join(__dirname, "../lambdas/deleteTextractJobMessage")),
+      handler: "index.handler",
+      role: deleteTextractJobMessageLambdaRole,
+      environment: {
+        CDK_DEPLOY_REGION: process.env.CDK_DEPLOY_REGION || "us-east-1",
+      },
+    });
+
     const cleanupTopicAndQueueLambda = new lambda.Function(this, "CleanupTopicAndQueue", {
       runtime: lambda.Runtime.NODEJS_14_X,
       code: lambda.Code.fromAsset(join(__dirname, "../lambdas/cleanupTopicAndQueue")),
@@ -149,10 +218,11 @@ export class ReadformeStack extends Stack {
       role: cleanupTopicAndQueueLambdaRole,
     });
 
-    /** ------------------ Tasks Definition ------------------ */
+    /** ------------------ Tasks and States Definition ------------------ */
 
     const checkDocumentTask = new tasks.LambdaInvoke(this, "Check Document", {
       lambdaFunction: checkDocumentLambda,
+      inputPath: "$.detail",
       outputPath: "$.Payload",
     });
 
@@ -172,6 +242,22 @@ export class ReadformeStack extends Stack {
       resultPath: "$.startDocumentTextDetectionResult",
     });
 
+    const receiveTextractJobMessageTask = new tasks.LambdaInvoke(this, "Receive Textract Job Message", {
+      lambdaFunction: receiveTextractJobMessageLambda,
+      resultSelector: { "Message.$": "$.Payload.Message" },
+      resultPath: "$.receiveTextractJobMessageResult",
+    });
+
+    const deleteTextractJobMessageTask = new tasks.LambdaInvoke(this, "Delete Textract Job Message", {
+      lambdaFunction: deleteTextractJobMessageLambda,
+      resultPath: sfn.JsonPath.DISCARD,
+    });
+
+    const checkTextractJobMessageReceivedChoice = new sfn.Choice(
+      this,
+      "Choice: Check If Received Textract Job Message"
+    );
+
     const documentTooLargeFailTask = new sfn.Fail(this, "Fail: Document Too Large", {
       error: "DocumentTooLarge",
       cause: "Size limit is 5MB!",
@@ -185,15 +271,19 @@ export class ReadformeStack extends Stack {
     /** ------------------ Step Function Definition ------------------ */
 
     const definition = checkDocumentTask
-      .addCatch(documentTooLargeFailTask, {
-        errors: ["DocumentTooLarge"],
-      })
-      .addCatch(unsupportedDocumentFailTask, {
-        errors: ["UnsupportedDocument"],
-      })
+      .addCatch(documentTooLargeFailTask, { errors: ["DocumentTooLarge"] })
+      .addCatch(unsupportedDocumentFailTask, { errors: ["UnsupportedDocument"] })
       .next(setupTopicAndQueueTask)
       .next(startDocumentTextDetectionTask)
-      .next(cleanupTopicAndQueueTask);
+      .next(receiveTextractJobMessageTask)
+      .next(
+        checkTextractJobMessageReceivedChoice
+          .when(
+            sfn.Condition.isNotPresent("$.receiveTextractJobMessageResult.Message.Body"),
+            receiveTextractJobMessageTask
+          )
+          .otherwise(deleteTextractJobMessageTask.next(cleanupTopicAndQueueTask))
+      );
 
     new sfn.StateMachine(this, "ReadForMe", {
       definition,
