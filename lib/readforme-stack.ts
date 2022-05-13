@@ -15,7 +15,8 @@ export class ReadformeStack extends Stack {
 
     /** ------------------ Bucket Definition ------------------ */
 
-    const random = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    const random =
+      Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
     const bucketName = `readforme-${random}`;
     const s3Bucket = new s3.Bucket(this, bucketName, {
       bucketName,
@@ -147,20 +148,45 @@ export class ReadformeStack extends Stack {
       }
     );
 
-    const pollyStartSpeechSynthesisPolicy = new iam.ManagedPolicy(this, "PollyStartSpeechSynthesisPolicy", {
-      statements: [
-        new iam.PolicyStatement({
-          effect: iam.Effect.ALLOW,
-          actions: ["polly:StartSpeechSynthesisTask"],
-          resources: ["*"],
-        }),
-        new iam.PolicyStatement({
-          effect: iam.Effect.ALLOW,
-          actions: ["s3:PutObject"],
-          resources: [`${s3Bucket.bucketArn}/results/*`],
-        }),
-      ],
-    });
+    const pollyStartSpeechSynthesisPolicy = new iam.ManagedPolicy(
+      this,
+      "PollyStartSpeechSynthesisPolicy",
+      {
+        statements: [
+          new iam.PolicyStatement({
+            effect: iam.Effect.ALLOW,
+            actions: ["polly:StartSpeechSynthesisTask"],
+            resources: ["*"],
+          }),
+          new iam.PolicyStatement({
+            effect: iam.Effect.ALLOW,
+            actions: ["s3:PutObject"],
+            resources: [`${s3Bucket.bucketArn}/results/*`],
+          }),
+          new iam.PolicyStatement({
+            effect: iam.Effect.ALLOW,
+            actions: ["sns:Publish"],
+            resources: [
+              `arn:aws:sns:${process.env.CDK_DEPLOY_REGION}:${process.env.CDK_DEPLOY_ACCOUNT}:ReadformeJob_*`,
+            ],
+          }),
+        ],
+      }
+    );
+
+    const pollyGetSpeechSynthesisPolicy = new iam.ManagedPolicy(
+      this,
+      "PollyGetSpeechSynthesisPolicy",
+      {
+        statements: [
+          new iam.PolicyStatement({
+            effect: iam.Effect.ALLOW,
+            actions: ["polly:GetSpeechSynthesisTask"],
+            resources: ["*"],
+          }),
+        ],
+      }
+    );
 
     const textractSNSPublishRole = new iam.Role(this, "TextractSNSPublishRole", {
       assumedBy: new iam.ServicePrincipal("textract.amazonaws.com"),
@@ -186,14 +212,18 @@ export class ReadformeStack extends Stack {
       roleName: "CleanupTopicAndQueueLambdaRole",
     });
 
-    const startDocumentTextDetectionLambdaRole = new iam.Role(this, "StartDocumentTextDetectionLambdaRole", {
-      assumedBy: new iam.ServicePrincipal("lambda.amazonaws.com"),
-      managedPolicies: [
-        iam.ManagedPolicy.fromAwsManagedPolicyName("service-role/AWSLambdaBasicExecutionRole"),
-        textractStartDocumentTextDetectionPolicy,
-      ],
-      roleName: "StartDocumentTextDetectionLambdaRole",
-    });
+    const startDocumentTextDetectionLambdaRole = new iam.Role(
+      this,
+      "StartDocumentTextDetectionLambdaRole",
+      {
+        assumedBy: new iam.ServicePrincipal("lambda.amazonaws.com"),
+        managedPolicies: [
+          iam.ManagedPolicy.fromAwsManagedPolicyName("service-role/AWSLambdaBasicExecutionRole"),
+          textractStartDocumentTextDetectionPolicy,
+        ],
+        roleName: "StartDocumentTextDetectionLambdaRole",
+      }
+    );
 
     const receiveSQSMessageLambdaRole = new iam.Role(this, "ReceiveJobMessageLambdaRole", {
       assumedBy: new iam.ServicePrincipal("lambda.amazonaws.com"),
@@ -213,27 +243,43 @@ export class ReadformeStack extends Stack {
       roleName: "DeleteSQSMessageLambdaRole",
     });
 
-    const getDocumentTextDetectionLambdaRole = new iam.Role(this, "GetDocumentTextDetectionLambdaRole", {
-      assumedBy: new iam.ServicePrincipal("lambda.amazonaws.com"),
-      managedPolicies: [
-        iam.ManagedPolicy.fromAwsManagedPolicyName("service-role/AWSLambdaBasicExecutionRole"),
-        textractGetDocumentTextDetectionPolicy,
-      ],
-    });
+    const getDocumentTextDetectionLambdaRole = new iam.Role(
+      this,
+      "GetDocumentTextDetectionLambdaRole",
+      {
+        assumedBy: new iam.ServicePrincipal("lambda.amazonaws.com"),
+        managedPolicies: [
+          iam.ManagedPolicy.fromAwsManagedPolicyName("service-role/AWSLambdaBasicExecutionRole"),
+          textractGetDocumentTextDetectionPolicy,
+        ],
+      }
+    );
 
-    const detectDominantLanguageLambdaRole = new iam.Role(this, "DetectDominantLanguageLambdaRole", {
-      assumedBy: new iam.ServicePrincipal("lambda.amazonaws.com"),
-      managedPolicies: [
-        iam.ManagedPolicy.fromAwsManagedPolicyName("service-role/AWSLambdaBasicExecutionRole"),
-        comprehendDetectDominantLanguagePolicy,
-      ],
-    });
+    const detectDominantLanguageLambdaRole = new iam.Role(
+      this,
+      "DetectDominantLanguageLambdaRole",
+      {
+        assumedBy: new iam.ServicePrincipal("lambda.amazonaws.com"),
+        managedPolicies: [
+          iam.ManagedPolicy.fromAwsManagedPolicyName("service-role/AWSLambdaBasicExecutionRole"),
+          comprehendDetectDominantLanguagePolicy,
+        ],
+      }
+    );
 
     const startSpeechSynthesisLambdaRole = new iam.Role(this, "StartSpeechSynthesisLambdaRole", {
       assumedBy: new iam.ServicePrincipal("lambda.amazonaws.com"),
       managedPolicies: [
         iam.ManagedPolicy.fromAwsManagedPolicyName("service-role/AWSLambdaBasicExecutionRole"),
         pollyStartSpeechSynthesisPolicy,
+      ],
+    });
+
+    const getSpeechSynthesisLambdaRole = new iam.Role(this, "GetSpeechSynthesisLambdaRole", {
+      assumedBy: new iam.ServicePrincipal("lambda.amazonaws.com"),
+      managedPolicies: [
+        iam.ManagedPolicy.fromAwsManagedPolicyName("service-role/AWSLambdaBasicExecutionRole"),
+        pollyGetSpeechSynthesisPolicy,
       ],
     });
 
@@ -254,15 +300,25 @@ export class ReadformeStack extends Stack {
     const startDocumentTextDetectionLambda = new lambda.Function(
       this,
       "StartDocumentTextDetection",
-      getLambdaFunctionProps("startDocumentTextDetection", startDocumentTextDetectionLambdaRole, undefined, {
-        TEXTRACT_SNS_PUBLISH_ROLE_ARN: textractSNSPublishRole.roleArn,
-      })
+      getLambdaFunctionProps(
+        "startDocumentTextDetection",
+        startDocumentTextDetectionLambdaRole,
+        undefined,
+        {
+          TEXTRACT_SNS_PUBLISH_ROLE_ARN: textractSNSPublishRole.roleArn,
+        }
+      )
     );
 
     const receiveSQSMessageLambda = new lambda.Function(
       this,
       "ReceiveSQSMessage",
-      getLambdaFunctionProps("receiveSQSMessage", receiveSQSMessageLambdaRole, Duration.seconds(30), {})
+      getLambdaFunctionProps(
+        "receiveSQSMessage",
+        receiveSQSMessageLambdaRole,
+        Duration.seconds(30),
+        {}
+      )
     );
 
     const deleteSQSMessageLambda = new lambda.Function(
@@ -274,13 +330,23 @@ export class ReadformeStack extends Stack {
     const getDocumentTextDetectionLambda = new lambda.Function(
       this,
       "GetDocumentTextDetection",
-      getLambdaFunctionProps("getDocumentTextDetection", getDocumentTextDetectionLambdaRole, undefined, {})
+      getLambdaFunctionProps(
+        "getDocumentTextDetection",
+        getDocumentTextDetectionLambdaRole,
+        undefined,
+        {}
+      )
     );
 
     const detectDominantLanguageLambda = new lambda.Function(
       this,
       "DetectDominantLanguage",
-      getLambdaFunctionProps("detectDominantLanguage", detectDominantLanguageLambdaRole, undefined, {})
+      getLambdaFunctionProps(
+        "detectDominantLanguage",
+        detectDominantLanguageLambdaRole,
+        undefined,
+        {}
+      )
     );
 
     const getVoiceIdLambda = new lambda.Function(
@@ -293,6 +359,12 @@ export class ReadformeStack extends Stack {
       this,
       "StartSpeechSynthesis",
       getLambdaFunctionProps("startSpeechSynthesis", startSpeechSynthesisLambdaRole, undefined, {})
+    );
+
+    const getSpeechSynthesisLambda = new lambda.Function(
+      this,
+      "GetSpeechSynthesis",
+      getLambdaFunctionProps("getSpeechSynthesis", getSpeechSynthesisLambdaRole, undefined, {})
     );
 
     const cleanupTopicAndQueueLambda = new lambda.Function(
@@ -324,22 +396,34 @@ export class ReadformeStack extends Stack {
       resultPath: sfn.JsonPath.DISCARD,
     });
 
-    const startDocumentTextDetectionTask = new tasks.LambdaInvoke(this, "Start Document Text Detection", {
-      lambdaFunction: startDocumentTextDetectionLambda,
-      resultSelector: { "JobId.$": "$.Payload.JobId" },
-      resultPath: "$.startDocumentTextDetectionResult",
-    });
+    const startDocumentTextDetectionTask = new tasks.LambdaInvoke(
+      this,
+      "Start Document Text Detection",
+      {
+        lambdaFunction: startDocumentTextDetectionLambda,
+        resultSelector: { "JobId.$": "$.Payload.JobId" },
+        resultPath: "$.startDocumentTextDetectionResult",
+      }
+    );
 
-    const receiveTextractJobMessageTask = new tasks.LambdaInvoke(this, "Receive Textract Job Message", {
-      lambdaFunction: receiveSQSMessageLambda,
-      resultSelector: { "Message.$": "$.Payload.Message" },
-      resultPath: "$.receiveTextractJobMessageResult",
-    });
+    const receiveTextractJobMessageTask = new tasks.LambdaInvoke(
+      this,
+      "Receive Textract Job Message",
+      {
+        lambdaFunction: receiveSQSMessageLambda,
+        resultSelector: { "Message.$": "$.Payload.Message" },
+        resultPath: "$.receiveTextractJobMessageResult",
+      }
+    );
 
-    const deleteTextractJobMessageTask = new tasks.LambdaInvoke(this, "Delete Textract Job Message", {
-      lambdaFunction: deleteSQSMessageLambda,
-      resultPath: sfn.JsonPath.DISCARD,
-    });
+    const deleteTextractJobMessageTask = new tasks.LambdaInvoke(
+      this,
+      "Delete Textract Job Message",
+      {
+        lambdaFunction: deleteSQSMessageLambda,
+        resultPath: sfn.JsonPath.DISCARD,
+      }
+    );
 
     const checkTextractJobMessageReceivedChoice = new sfn.Choice(
       this,
@@ -351,12 +435,16 @@ export class ReadformeStack extends Stack {
       "Choice: Check If Received Polly Task Message"
     );
 
-    const getDocumentTextDetectionTask = new tasks.LambdaInvoke(this, "Get Document Text Detection", {
-      lambdaFunction: getDocumentTextDetectionLambda,
-      inputPath: "$.receiveTextractJobMessageResult.Message.Body",
-      resultSelector: { "Text.$": "$.Payload" },
-      resultPath: "$.getDocumentTextDetectionResult",
-    });
+    const getDocumentTextDetectionTask = new tasks.LambdaInvoke(
+      this,
+      "Get Document Text Detection",
+      {
+        lambdaFunction: getDocumentTextDetectionLambda,
+        inputPath: "$.receiveTextractJobMessageResult.Message.Body",
+        resultSelector: { "Text.$": "$.Payload" },
+        resultPath: "$.getDocumentTextDetectionResult",
+      }
+    );
 
     const detectDominantLanguageTask = new tasks.LambdaInvoke(this, "Detect Dominant Language", {
       lambdaFunction: detectDominantLanguageLambda,
@@ -387,6 +475,13 @@ export class ReadformeStack extends Stack {
     const deletePollyTaskMessageTask = new tasks.LambdaInvoke(this, "Delete Polly Task Message", {
       lambdaFunction: deleteSQSMessageLambda,
       resultPath: sfn.JsonPath.DISCARD,
+    });
+
+    const getSpeechSynthesisTask = new tasks.LambdaInvoke(this, "Get Speech Synthesis", {
+      lambdaFunction: getSpeechSynthesisLambda,
+      inputPath: "$.receivePollyTaskMessageResult.Message.Body",
+      resultSelector: { "SynthesisTask.$": "$.Payload.SynthesisTask" },
+      resultPath: "$.getSpeechSynthesisTaskResult",
     });
 
     const documentTooLargeFailTask = new sfn.Fail(this, "Fail: Document Too Large", {
@@ -424,10 +519,13 @@ export class ReadformeStack extends Stack {
           .otherwise(
             deleteTextractJobMessageTask
               .next(
-                getDocumentTextDetectionTask.addCatch(cleanupTopicAndQueueTask2.next(noTextFoundFailTask), {
-                  errors: ["NoTextFound"],
-                  resultPath: "$.error",
-                })
+                getDocumentTextDetectionTask.addCatch(
+                  cleanupTopicAndQueueTask2.next(noTextFoundFailTask),
+                  {
+                    errors: ["NoTextFound"],
+                    resultPath: "$.error",
+                  }
+                )
               )
               .next(detectDominantLanguageTask)
               .next(getVoiceIdTask)
@@ -439,7 +537,11 @@ export class ReadformeStack extends Stack {
                     sfn.Condition.isNotPresent("$.receivePollyTaskMessageResult.Message.Body"),
                     receivePollyTaskMessageTask
                   )
-                  .otherwise(deletePollyTaskMessageTask.next(cleanupTopicAndQueueTask1))
+                  .otherwise(
+                    deletePollyTaskMessageTask
+                      .next(getSpeechSynthesisTask)
+                      .next(cleanupTopicAndQueueTask1)
+                  )
               )
           )
       );
