@@ -77,25 +77,6 @@ export class ReadformeStack extends Stack {
       ],
     });
 
-    const textractStartDocumentTextDetectionPolicy = new iam.ManagedPolicy(
-      this,
-      "TextractStartDocumentTextDetectionPolicy",
-      {
-        statements: [
-          new iam.PolicyStatement({
-            effect: iam.Effect.ALLOW,
-            actions: ["textract:StartDocumentTextDetection"],
-            resources: ["*"],
-          }),
-          new iam.PolicyStatement({
-            effect: iam.Effect.ALLOW,
-            actions: ["s3:GetObject"],
-            resources: [`${s3Bucket.bucketArn}/documents/*`],
-          }),
-        ],
-      }
-    );
-
     const SQSReceiveJobMessagePolicy = new iam.ManagedPolicy(this, "SQSReceiveJobMessagePolicy", {
       statements: [
         new iam.PolicyStatement({
@@ -212,19 +193,6 @@ export class ReadformeStack extends Stack {
       roleName: "CleanupTopicAndQueueLambdaRole",
     });
 
-    const startDocumentTextDetectionLambdaRole = new iam.Role(
-      this,
-      "StartDocumentTextDetectionLambdaRole",
-      {
-        assumedBy: new iam.ServicePrincipal("lambda.amazonaws.com"),
-        managedPolicies: [
-          iam.ManagedPolicy.fromAwsManagedPolicyName("service-role/AWSLambdaBasicExecutionRole"),
-          textractStartDocumentTextDetectionPolicy,
-        ],
-        roleName: "StartDocumentTextDetectionLambdaRole",
-      }
-    );
-
     const receiveSQSMessageLambdaRole = new iam.Role(this, "ReceiveJobMessageLambdaRole", {
       assumedBy: new iam.ServicePrincipal("lambda.amazonaws.com"),
       managedPolicies: [
@@ -295,19 +263,6 @@ export class ReadformeStack extends Stack {
       this,
       "SetupTopicAndQueue",
       getLambdaFunctionProps("setupTopicAndQueue", setupTopicAndQueueLambdaRole, undefined, {})
-    );
-
-    const startDocumentTextDetectionLambda = new lambda.Function(
-      this,
-      "StartDocumentTextDetection",
-      getLambdaFunctionProps(
-        "startDocumentTextDetection",
-        startDocumentTextDetectionLambdaRole,
-        undefined,
-        {
-          TEXTRACT_SNS_PUBLISH_ROLE_ARN: textractSNSPublishRole.roleArn,
-        }
-      )
     );
 
     const receiveSQSMessageLambda = new lambda.Function(
@@ -396,13 +351,27 @@ export class ReadformeStack extends Stack {
       resultPath: sfn.JsonPath.DISCARD,
     });
 
-    const startDocumentTextDetectionTask = new tasks.LambdaInvoke(
+    const startDocumentTextDetectionTask = new tasks.CallAwsService(
       this,
       "Start Document Text Detection",
       {
-        lambdaFunction: startDocumentTextDetectionLambda,
-        resultSelector: { "JobId.$": "$.Payload.JobId" },
+        service: "textract",
+        action: "startDocumentTextDetection",
+        parameters: {
+          DocumentLocation: {
+            S3Object: {
+              Bucket: sfn.JsonPath.stringAt("$.bucketName"),
+              Name: sfn.JsonPath.stringAt("$.objectKey"),
+            },
+          },
+          NotificationChannel: {
+            RoleArn: textractSNSPublishRole.roleArn,
+            SnsTopicArn: sfn.JsonPath.stringAt("$.topicArn"),
+          },
+        },
+        resultSelector: { "JobId.$": "$.JobId" },
         resultPath: "$.startDocumentTextDetectionResult",
+        iamResources: ["*"],
       }
     );
 
