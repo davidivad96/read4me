@@ -107,21 +107,17 @@ export class ReadformeStack extends Stack {
       ],
     });
 
-    const SQSDeleteTextractJobMessagePolicy = new iam.ManagedPolicy(
-      this,
-      "SQSDeleteTextractJobMessagePolicy",
-      {
-        statements: [
-          new iam.PolicyStatement({
-            effect: iam.Effect.ALLOW,
-            actions: ["sqs:DeleteMessage"],
-            resources: [
-              `arn:aws:sqs:${process.env.CDK_DEPLOY_REGION}:${process.env.CDK_DEPLOY_ACCOUNT}:ReadformeJob_*`,
-            ],
-          }),
-        ],
-      }
-    );
+    const SQSDeleteSQSMessagePolicy = new iam.ManagedPolicy(this, "SQSDeleteSQSMessagePolicy", {
+      statements: [
+        new iam.PolicyStatement({
+          effect: iam.Effect.ALLOW,
+          actions: ["sqs:DeleteMessage"],
+          resources: [
+            `arn:aws:sqs:${process.env.CDK_DEPLOY_REGION}:${process.env.CDK_DEPLOY_ACCOUNT}:ReadformeJob_*`,
+          ],
+        }),
+      ],
+    });
 
     const textractGetDocumentTextDetectionPolicy = new iam.ManagedPolicy(
       this,
@@ -208,13 +204,13 @@ export class ReadformeStack extends Stack {
       roleName: "ReceiveJobMessageLambdaRole",
     });
 
-    const deleteTextractJobMessageLambdaRole = new iam.Role(this, "DeleteTextractJobMessageLambdaRole", {
+    const deleteSQSMessageLambdaRole = new iam.Role(this, "DeleteSQSMessageLambdaRole", {
       assumedBy: new iam.ServicePrincipal("lambda.amazonaws.com"),
       managedPolicies: [
         iam.ManagedPolicy.fromAwsManagedPolicyName("service-role/AWSLambdaBasicExecutionRole"),
-        SQSDeleteTextractJobMessagePolicy,
+        SQSDeleteSQSMessagePolicy,
       ],
-      roleName: "DeleteTextractJobMessageLambdaRole",
+      roleName: "DeleteSQSMessageLambdaRole",
     });
 
     const getDocumentTextDetectionLambdaRole = new iam.Role(this, "GetDocumentTextDetectionLambdaRole", {
@@ -269,10 +265,10 @@ export class ReadformeStack extends Stack {
       getLambdaFunctionProps("receiveSQSMessage", receiveSQSMessageLambdaRole, Duration.seconds(30), {})
     );
 
-    const deleteTextractJobMessageLambda = new lambda.Function(
+    const deleteSQSMessageLambda = new lambda.Function(
       this,
-      "DeleteTextractJobMessage",
-      getLambdaFunctionProps("deleteTextractJobMessage", deleteTextractJobMessageLambdaRole, undefined, {})
+      "DeleteSQSMessage",
+      getLambdaFunctionProps("deleteSQSMessage", deleteSQSMessageLambdaRole, undefined, {})
     );
 
     const getDocumentTextDetectionLambda = new lambda.Function(
@@ -341,7 +337,7 @@ export class ReadformeStack extends Stack {
     });
 
     const deleteTextractJobMessageTask = new tasks.LambdaInvoke(this, "Delete Textract Job Message", {
-      lambdaFunction: deleteTextractJobMessageLambda,
+      lambdaFunction: deleteSQSMessageLambda,
       resultPath: sfn.JsonPath.DISCARD,
     });
 
@@ -386,6 +382,11 @@ export class ReadformeStack extends Stack {
       lambdaFunction: receiveSQSMessageLambda,
       resultSelector: { "Message.$": "$.Payload.Message" },
       resultPath: "$.receivePollyTaskMessageResult",
+    });
+
+    const deletePollyTaskMessageTask = new tasks.LambdaInvoke(this, "Delete Polly Task Message", {
+      lambdaFunction: deleteSQSMessageLambda,
+      resultPath: sfn.JsonPath.DISCARD,
     });
 
     const documentTooLargeFailTask = new sfn.Fail(this, "Fail: Document Too Large", {
@@ -438,7 +439,7 @@ export class ReadformeStack extends Stack {
                     sfn.Condition.isNotPresent("$.receivePollyTaskMessageResult.Message.Body"),
                     receivePollyTaskMessageTask
                   )
-                  .otherwise(cleanupTopicAndQueueTask1)
+                  .otherwise(deletePollyTaskMessageTask.next(cleanupTopicAndQueueTask1))
               )
           )
       );
