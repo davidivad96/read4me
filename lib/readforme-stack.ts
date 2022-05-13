@@ -39,8 +39,8 @@ export class ReadformeStack extends Stack {
             "sqs:SetQueueAttributes",
           ],
           resources: [
-            `arn:aws:sns:*:${process.env.CDK_DEPLOY_ACCOUNT}:ReadformeJob_*`,
-            `arn:aws:sqs:*:${process.env.CDK_DEPLOY_ACCOUNT}:ReadformeJob_*`,
+            `arn:aws:sns:${process.env.CDK_DEPLOY_REGION}:${process.env.CDK_DEPLOY_ACCOUNT}:ReadformeJob_*`,
+            `arn:aws:sqs:${process.env.CDK_DEPLOY_REGION}:${process.env.CDK_DEPLOY_ACCOUNT}:ReadformeJob_*`,
           ],
         }),
       ],
@@ -57,8 +57,8 @@ export class ReadformeStack extends Stack {
           effect: iam.Effect.ALLOW,
           actions: ["sns:DeleteTopic", "sqs:DeleteQueue"],
           resources: [
-            `arn:aws:sns:*:${process.env.CDK_DEPLOY_ACCOUNT}:ReadformeJob_*`,
-            `arn:aws:sqs:*:${process.env.CDK_DEPLOY_ACCOUNT}:ReadformeJob_*`,
+            `arn:aws:sns:${process.env.CDK_DEPLOY_REGION}:${process.env.CDK_DEPLOY_ACCOUNT}:ReadformeJob_*`,
+            `arn:aws:sqs:${process.env.CDK_DEPLOY_REGION}:${process.env.CDK_DEPLOY_ACCOUNT}:ReadformeJob_*`,
           ],
         }),
       ],
@@ -69,7 +69,9 @@ export class ReadformeStack extends Stack {
         new iam.PolicyStatement({
           effect: iam.Effect.ALLOW,
           actions: ["sns:Publish"],
-          resources: [`arn:aws:sns:*:${process.env.CDK_DEPLOY_ACCOUNT}:ReadformeJob_*`],
+          resources: [
+            `arn:aws:sns:${process.env.CDK_DEPLOY_REGION}:${process.env.CDK_DEPLOY_ACCOUNT}:ReadformeJob_*`,
+          ],
         }),
       ],
     });
@@ -93,25 +95,33 @@ export class ReadformeStack extends Stack {
       }
     );
 
-    const SQSReceiveTextractJobMessagePolicy = new iam.ManagedPolicy(this, "SQSReceiveTextractJobMessagePolicy", {
+    const SQSReceiveJobMessagePolicy = new iam.ManagedPolicy(this, "SQSReceiveJobMessagePolicy", {
       statements: [
         new iam.PolicyStatement({
           effect: iam.Effect.ALLOW,
           actions: ["sqs:ReceiveMessage"],
-          resources: [`arn:aws:sqs:*:${process.env.CDK_DEPLOY_ACCOUNT}:ReadformeJob_*`],
+          resources: [
+            `arn:aws:sqs:${process.env.CDK_DEPLOY_REGION}:${process.env.CDK_DEPLOY_ACCOUNT}:ReadformeJob_*`,
+          ],
         }),
       ],
     });
 
-    const SQSDeleteTextractJobMessagePolicy = new iam.ManagedPolicy(this, "SQSDeleteTextractJobMessagePolicy", {
-      statements: [
-        new iam.PolicyStatement({
-          effect: iam.Effect.ALLOW,
-          actions: ["sqs:DeleteMessage"],
-          resources: [`arn:aws:sqs:*:${process.env.CDK_DEPLOY_ACCOUNT}:ReadformeJob_*`],
-        }),
-      ],
-    });
+    const SQSDeleteTextractJobMessagePolicy = new iam.ManagedPolicy(
+      this,
+      "SQSDeleteTextractJobMessagePolicy",
+      {
+        statements: [
+          new iam.PolicyStatement({
+            effect: iam.Effect.ALLOW,
+            actions: ["sqs:DeleteMessage"],
+            resources: [
+              `arn:aws:sqs:${process.env.CDK_DEPLOY_REGION}:${process.env.CDK_DEPLOY_ACCOUNT}:ReadformeJob_*`,
+            ],
+          }),
+        ],
+      }
+    );
 
     const textractGetDocumentTextDetectionPolicy = new iam.ManagedPolicy(
       this,
@@ -140,6 +150,21 @@ export class ReadformeStack extends Stack {
         ],
       }
     );
+
+    const pollyStartSpeechSynthesisPolicy = new iam.ManagedPolicy(this, "PollyStartSpeechSynthesisPolicy", {
+      statements: [
+        new iam.PolicyStatement({
+          effect: iam.Effect.ALLOW,
+          actions: ["polly:StartSpeechSynthesisTask"],
+          resources: ["*"],
+        }),
+        new iam.PolicyStatement({
+          effect: iam.Effect.ALLOW,
+          actions: ["s3:PutObject"],
+          resources: [`${s3Bucket.bucketArn}/results/*`],
+        }),
+      ],
+    });
 
     const textractSNSPublishRole = new iam.Role(this, "TextractSNSPublishRole", {
       assumedBy: new iam.ServicePrincipal("textract.amazonaws.com"),
@@ -174,13 +199,13 @@ export class ReadformeStack extends Stack {
       roleName: "StartDocumentTextDetectionLambdaRole",
     });
 
-    const receiveTextractJobMessageLambdaRole = new iam.Role(this, "ReceiveTextractJobMessageLambdaRole", {
+    const receiveSQSMessageLambdaRole = new iam.Role(this, "ReceiveJobMessageLambdaRole", {
       assumedBy: new iam.ServicePrincipal("lambda.amazonaws.com"),
       managedPolicies: [
         iam.ManagedPolicy.fromAwsManagedPolicyName("service-role/AWSLambdaBasicExecutionRole"),
-        SQSReceiveTextractJobMessagePolicy,
+        SQSReceiveJobMessagePolicy,
       ],
-      roleName: "ReceiveTextractJobMessageLambdaRole",
+      roleName: "ReceiveJobMessageLambdaRole",
     });
 
     const deleteTextractJobMessageLambdaRole = new iam.Role(this, "DeleteTextractJobMessageLambdaRole", {
@@ -208,6 +233,14 @@ export class ReadformeStack extends Stack {
       ],
     });
 
+    const startSpeechSynthesisLambdaRole = new iam.Role(this, "StartSpeechSynthesisLambdaRole", {
+      assumedBy: new iam.ServicePrincipal("lambda.amazonaws.com"),
+      managedPolicies: [
+        iam.ManagedPolicy.fromAwsManagedPolicyName("service-role/AWSLambdaBasicExecutionRole"),
+        pollyStartSpeechSynthesisPolicy,
+      ],
+    });
+
     /** ------------------ Lambda Handlers Definition ------------------ */
 
     const checkDocumentLambda = new lambda.Function(
@@ -230,10 +263,10 @@ export class ReadformeStack extends Stack {
       })
     );
 
-    const receiveTextractJobMessageLambda = new lambda.Function(
+    const receiveSQSMessageLambda = new lambda.Function(
       this,
-      "ReceiveTextractJobMessage",
-      getLambdaFunctionProps("receiveTextractJobMessage", receiveTextractJobMessageLambdaRole, Duration.seconds(30), {})
+      "ReceiveSQSMessage",
+      getLambdaFunctionProps("receiveSQSMessage", receiveSQSMessageLambdaRole, Duration.seconds(30), {})
     );
 
     const deleteTextractJobMessageLambda = new lambda.Function(
@@ -258,6 +291,12 @@ export class ReadformeStack extends Stack {
       this,
       "GetVoiceId",
       getLambdaFunctionProps("getVoiceId", undefined, undefined, {})
+    );
+
+    const startSpeechSynthesisLambda = new lambda.Function(
+      this,
+      "StartSpeechSynthesis",
+      getLambdaFunctionProps("startSpeechSynthesis", startSpeechSynthesisLambdaRole, undefined, {})
     );
 
     const cleanupTopicAndQueueLambda = new lambda.Function(
@@ -296,7 +335,7 @@ export class ReadformeStack extends Stack {
     });
 
     const receiveTextractJobMessageTask = new tasks.LambdaInvoke(this, "Receive Textract Job Message", {
-      lambdaFunction: receiveTextractJobMessageLambda,
+      lambdaFunction: receiveSQSMessageLambda,
       resultSelector: { "Message.$": "$.Payload.Message" },
       resultPath: "$.receiveTextractJobMessageResult",
     });
@@ -309,6 +348,11 @@ export class ReadformeStack extends Stack {
     const checkTextractJobMessageReceivedChoice = new sfn.Choice(
       this,
       "Choice: Check If Received Textract Job Message"
+    );
+
+    const checkPollyTaskMessageReceivedChoice = new sfn.Choice(
+      this,
+      "Choice: Check If Received Polly Task Message"
     );
 
     const getDocumentTextDetectionTask = new tasks.LambdaInvoke(this, "Get Document Text Detection", {
@@ -332,6 +376,18 @@ export class ReadformeStack extends Stack {
       resultPath: "$.getVoiceIdResult",
     });
 
+    const startSpeechSynthesisTask = new tasks.LambdaInvoke(this, "Start Speech Synthesis", {
+      lambdaFunction: startSpeechSynthesisLambda,
+      resultSelector: { "TaskId.$": "$.Payload.SynthesisTask.TaskId" },
+      resultPath: "$.startSpeechSynthesisTaskResult",
+    });
+
+    const receivePollyTaskMessageTask = new tasks.LambdaInvoke(this, "Receive Polly Task Message", {
+      lambdaFunction: receiveSQSMessageLambda,
+      resultSelector: { "Message.$": "$.Payload.Message" },
+      resultPath: "$.receivePollyTaskMessageResult",
+    });
+
     const documentTooLargeFailTask = new sfn.Fail(this, "Fail: Document Too Large", {
       error: "DocumentTooLarge",
       cause: "Size limit is 5MB!",
@@ -350,8 +406,11 @@ export class ReadformeStack extends Stack {
     /** ------------------ Step Function Definition ------------------ */
 
     const definition = checkDocumentTask
-      .addCatch(documentTooLargeFailTask, { errors: ["DocumentTooLarge"] })
-      .addCatch(unsupportedDocumentFailTask, { errors: ["UnsupportedDocument"] })
+      .addCatch(documentTooLargeFailTask, { errors: ["DocumentTooLarge"], resultPath: "$.error" })
+      .addCatch(unsupportedDocumentFailTask, {
+        errors: ["UnsupportedDocument"],
+        resultPath: "$.error",
+      })
       .next(setupTopicAndQueueTask)
       .next(startDocumentTextDetectionTask)
       .next(receiveTextractJobMessageTask)
@@ -371,7 +430,16 @@ export class ReadformeStack extends Stack {
               )
               .next(detectDominantLanguageTask)
               .next(getVoiceIdTask)
-              .next(cleanupTopicAndQueueTask1)
+              .next(startSpeechSynthesisTask)
+              .next(receivePollyTaskMessageTask)
+              .next(
+                checkPollyTaskMessageReceivedChoice
+                  .when(
+                    sfn.Condition.isNotPresent("$.receivePollyTaskMessageResult.Message.Body"),
+                    receivePollyTaskMessageTask
+                  )
+                  .otherwise(cleanupTopicAndQueueTask1)
+              )
           )
       );
 

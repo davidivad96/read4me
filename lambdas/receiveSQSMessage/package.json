@@ -1,5 +1,5 @@
 {
-  "name": "receivetextractjobmessage",
+  "name": "receivesqsmessage",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
