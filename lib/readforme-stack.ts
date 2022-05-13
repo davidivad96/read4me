@@ -127,6 +127,20 @@ export class ReadformeStack extends Stack {
       }
     );
 
+    const comprehendDetectDominantLanguagePolicy = new iam.ManagedPolicy(
+      this,
+      "ComprehendDetectDominantLanguagePolicy",
+      {
+        statements: [
+          new iam.PolicyStatement({
+            effect: iam.Effect.ALLOW,
+            actions: ["comprehend:DetectDominantLanguage"],
+            resources: ["*"],
+          }),
+        ],
+      }
+    );
+
     const textractSNSPublishRole = new iam.Role(this, "TextractSNSPublishRole", {
       assumedBy: new iam.ServicePrincipal("textract.amazonaws.com"),
       managedPolicies: [SNSPublishPolicy],
@@ -186,6 +200,14 @@ export class ReadformeStack extends Stack {
       ],
     });
 
+    const detectDominantLanguageLambdaRole = new iam.Role(this, "DetectDominantLanguageLambdaRole", {
+      assumedBy: new iam.ServicePrincipal("lambda.amazonaws.com"),
+      managedPolicies: [
+        iam.ManagedPolicy.fromAwsManagedPolicyName("service-role/AWSLambdaBasicExecutionRole"),
+        comprehendDetectDominantLanguagePolicy,
+      ],
+    });
+
     /** ------------------ Lambda Handlers Definition ------------------ */
 
     const checkDocumentLambda = new lambda.Function(
@@ -224,6 +246,12 @@ export class ReadformeStack extends Stack {
       this,
       "GetDocumentTextDetection",
       getLambdaFunctionProps("getDocumentTextDetection", getDocumentTextDetectionLambdaRole, undefined, {})
+    );
+
+    const detectDominantLanguageLambda = new lambda.Function(
+      this,
+      "DetectDominantLanguage",
+      getLambdaFunctionProps("detectDominantLanguage", detectDominantLanguageLambdaRole, undefined, {})
     );
 
     const cleanupTopicAndQueueLambda = new lambda.Function(
@@ -284,6 +312,13 @@ export class ReadformeStack extends Stack {
       resultPath: "$.getDocumentTextDetectionResult",
     });
 
+    const detectDominantLanguageTask = new tasks.LambdaInvoke(this, "Detect Dominant Language", {
+      lambdaFunction: detectDominantLanguageLambda,
+      inputPath: "$.getDocumentTextDetectionResult",
+      resultSelector: { "LanguageCode.$": "$.Payload.Languages[0].LanguageCode" },
+      resultPath: "$.detectDominantLanguageResult",
+    });
+
     const documentTooLargeFailTask = new sfn.Fail(this, "Fail: Document Too Large", {
       error: "DocumentTooLarge",
       cause: "Size limit is 5MB!",
@@ -321,6 +356,7 @@ export class ReadformeStack extends Stack {
                   resultPath: "$.error",
                 })
               )
+              .next(detectDominantLanguageTask)
               .next(cleanupTopicAndQueueTask1)
           )
       );
