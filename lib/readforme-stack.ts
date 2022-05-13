@@ -2,10 +2,12 @@ import { Stack, StackProps, Duration, RemovalPolicy } from "aws-cdk-lib";
 import { Construct } from "constructs";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as s3 from "aws-cdk-lib/aws-s3";
+import * as eventbridge from "aws-cdk-lib/aws-events";
+import * as targets from "aws-cdk-lib/aws-events-targets";
 import * as sfn from "aws-cdk-lib/aws-stepfunctions";
 import * as tasks from "aws-cdk-lib/aws-stepfunctions-tasks";
 import * as lambda from "aws-cdk-lib/aws-lambda";
-import { join } from "path";
+import { getLambdaFunctionProps } from "../utils";
 
 export class ReadformeStack extends Stack {
   constructor(scope: Construct, id: string, props?: StackProps) {
@@ -18,6 +20,7 @@ export class ReadformeStack extends Stack {
     const s3Bucket = new s3.Bucket(this, bucketName, {
       bucketName,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      eventBridgeEnabled: true,
       // TODO: remove "removalPolicy" attribute when the stack is working
       removalPolicy: RemovalPolicy.DESTROY,
     });
@@ -110,6 +113,20 @@ export class ReadformeStack extends Stack {
       ],
     });
 
+    const textractGetDocumentTextDetectionPolicy = new iam.ManagedPolicy(
+      this,
+      "TextractGetDocumentTextDetectionPolicy",
+      {
+        statements: [
+          new iam.PolicyStatement({
+            effect: iam.Effect.ALLOW,
+            actions: ["textract:GetDocumentTextDetection"],
+            resources: ["*"],
+          }),
+        ],
+      }
+    );
+
     const textractSNSPublishRole = new iam.Role(this, "TextractSNSPublishRole", {
       assumedBy: new iam.ServicePrincipal("textract.amazonaws.com"),
       managedPolicies: [SNSPublishPolicy],
@@ -161,62 +178,59 @@ export class ReadformeStack extends Stack {
       roleName: "DeleteTextractJobMessageLambdaRole",
     });
 
+    const getDocumentTextDetectionLambdaRole = new iam.Role(this, "GetDocumentTextDetectionLambdaRole", {
+      assumedBy: new iam.ServicePrincipal("lambda.amazonaws.com"),
+      managedPolicies: [
+        iam.ManagedPolicy.fromAwsManagedPolicyName("service-role/AWSLambdaBasicExecutionRole"),
+        textractGetDocumentTextDetectionPolicy,
+      ],
+    });
+
     /** ------------------ Lambda Handlers Definition ------------------ */
 
-    const checkDocumentLambda = new lambda.Function(this, "CheckDocument", {
-      runtime: lambda.Runtime.NODEJS_14_X,
-      code: lambda.Code.fromAsset(join(__dirname, "../lambdas/checkDocument")),
-      handler: "index.handler",
-    });
+    const checkDocumentLambda = new lambda.Function(
+      this,
+      "CheckDocument",
+      getLambdaFunctionProps("checkDocument", undefined, undefined, {})
+    );
 
-    const setupTopicAndQueueLambda = new lambda.Function(this, "SetupTopicAndQueue", {
-      runtime: lambda.Runtime.NODEJS_14_X,
-      code: lambda.Code.fromAsset(join(__dirname, "../lambdas/setupTopicAndQueue")),
-      handler: "index.handler",
-      role: setupTopicAndQueueLambdaRole,
-      environment: {
-        CDK_DEPLOY_REGION: process.env.CDK_DEPLOY_REGION || "us-east-1",
-      },
-    });
+    const setupTopicAndQueueLambda = new lambda.Function(
+      this,
+      "SetupTopicAndQueue",
+      getLambdaFunctionProps("setupTopicAndQueue", setupTopicAndQueueLambdaRole, undefined, {})
+    );
 
-    const startDocumentTextDetectionLambda = new lambda.Function(this, "StartDocumentTextDetection", {
-      runtime: lambda.Runtime.NODEJS_14_X,
-      code: lambda.Code.fromAsset(join(__dirname, "../lambdas/startDocumentTextDetection")),
-      handler: "index.handler",
-      role: startDocumentTextDetectionLambdaRole,
-      environment: {
-        CDK_DEPLOY_REGION: process.env.CDK_DEPLOY_REGION || "us-east-1",
+    const startDocumentTextDetectionLambda = new lambda.Function(
+      this,
+      "StartDocumentTextDetection",
+      getLambdaFunctionProps("startDocumentTextDetection", startDocumentTextDetectionLambdaRole, undefined, {
         TEXTRACT_SNS_PUBLISH_ROLE_ARN: textractSNSPublishRole.roleArn,
-      },
-    });
+      })
+    );
 
-    const receiveTextractJobMessageLambda = new lambda.Function(this, "ReceiveTextractJobMessage", {
-      runtime: lambda.Runtime.NODEJS_14_X,
-      code: lambda.Code.fromAsset(join(__dirname, "../lambdas/receiveTextractJobMessage")),
-      handler: "index.handler",
-      role: receiveTextractJobMessageLambdaRole,
-      timeout: Duration.seconds(30),
-      environment: {
-        CDK_DEPLOY_REGION: process.env.CDK_DEPLOY_REGION || "us-east-1",
-      },
-    });
+    const receiveTextractJobMessageLambda = new lambda.Function(
+      this,
+      "ReceiveTextractJobMessage",
+      getLambdaFunctionProps("receiveTextractJobMessage", receiveTextractJobMessageLambdaRole, Duration.seconds(30), {})
+    );
 
-    const deleteTextractJobMessageLambda = new lambda.Function(this, "DeleteTextractJobMessage", {
-      runtime: lambda.Runtime.NODEJS_14_X,
-      code: lambda.Code.fromAsset(join(__dirname, "../lambdas/deleteTextractJobMessage")),
-      handler: "index.handler",
-      role: deleteTextractJobMessageLambdaRole,
-      environment: {
-        CDK_DEPLOY_REGION: process.env.CDK_DEPLOY_REGION || "us-east-1",
-      },
-    });
+    const deleteTextractJobMessageLambda = new lambda.Function(
+      this,
+      "DeleteTextractJobMessage",
+      getLambdaFunctionProps("deleteTextractJobMessage", deleteTextractJobMessageLambdaRole, undefined, {})
+    );
 
-    const cleanupTopicAndQueueLambda = new lambda.Function(this, "CleanupTopicAndQueue", {
-      runtime: lambda.Runtime.NODEJS_14_X,
-      code: lambda.Code.fromAsset(join(__dirname, "../lambdas/cleanupTopicAndQueue")),
-      handler: "index.handler",
-      role: cleanupTopicAndQueueLambdaRole,
-    });
+    const getDocumentTextDetectionLambda = new lambda.Function(
+      this,
+      "GetDocumentTextDetection",
+      getLambdaFunctionProps("getDocumentTextDetection", getDocumentTextDetectionLambdaRole, undefined, {})
+    );
+
+    const cleanupTopicAndQueueLambda = new lambda.Function(
+      this,
+      "CleanupTopicAndQueue",
+      getLambdaFunctionProps("cleanupTopicAndQueue", cleanupTopicAndQueueLambdaRole, undefined, {})
+    );
 
     /** ------------------ Tasks and States Definition ------------------ */
 
@@ -231,7 +245,12 @@ export class ReadformeStack extends Stack {
       outputPath: "$.Payload",
     });
 
-    const cleanupTopicAndQueueTask = new tasks.LambdaInvoke(this, "Cleanup Topic And Queue", {
+    const cleanupTopicAndQueueTask1 = new tasks.LambdaInvoke(this, "Cleanup Topic And Queue 1", {
+      lambdaFunction: cleanupTopicAndQueueLambda,
+      resultPath: sfn.JsonPath.DISCARD,
+    });
+
+    const cleanupTopicAndQueueTask2 = new tasks.LambdaInvoke(this, "Cleanup Topic And Queue 2", {
       lambdaFunction: cleanupTopicAndQueueLambda,
       resultPath: sfn.JsonPath.DISCARD,
     });
@@ -258,6 +277,13 @@ export class ReadformeStack extends Stack {
       "Choice: Check If Received Textract Job Message"
     );
 
+    const getDocumentTextDetectionTask = new tasks.LambdaInvoke(this, "Get Document Text Detection", {
+      lambdaFunction: getDocumentTextDetectionLambda,
+      inputPath: "$.receiveTextractJobMessageResult.Message.Body",
+      resultSelector: { "Text.$": "$.Payload" },
+      resultPath: "$.getDocumentTextDetectionResult",
+    });
+
     const documentTooLargeFailTask = new sfn.Fail(this, "Fail: Document Too Large", {
       error: "DocumentTooLarge",
       cause: "Size limit is 5MB!",
@@ -266,6 +292,11 @@ export class ReadformeStack extends Stack {
     const unsupportedDocumentFailTask = new sfn.Fail(this, "Fail: Unsupported Document", {
       error: "UnsupportedDocument",
       cause: "Allowed documents: PDF, PNG, JPG, JPEG and TIFF",
+    });
+
+    const noTextFoundFailTask = new sfn.Fail(this, "Fail: No Text Found", {
+      error: "NoTextFound",
+      cause: "No text was found in the document!",
     });
 
     /** ------------------ Step Function Definition ------------------ */
@@ -282,15 +313,39 @@ export class ReadformeStack extends Stack {
             sfn.Condition.isNotPresent("$.receiveTextractJobMessageResult.Message.Body"),
             receiveTextractJobMessageTask
           )
-          .otherwise(deleteTextractJobMessageTask.next(cleanupTopicAndQueueTask))
+          .otherwise(
+            deleteTextractJobMessageTask
+              .next(
+                getDocumentTextDetectionTask.addCatch(cleanupTopicAndQueueTask2.next(noTextFoundFailTask), {
+                  errors: ["NoTextFound"],
+                  resultPath: "$.error",
+                })
+              )
+              .next(cleanupTopicAndQueueTask1)
+          )
       );
 
-    new sfn.StateMachine(this, "ReadForMe", {
+    const readformeStateMachine = new sfn.StateMachine(this, "ReadForMe", {
       definition,
       timeout: Duration.minutes(5),
       stateMachineName: "ReadForMe",
       stateMachineType: sfn.StateMachineType.STANDARD,
       tracingEnabled: true,
+    });
+
+    /** ------------------ EventBridge Rule Definition ------------------ */
+
+    new eventbridge.Rule(this, "S3TriggerStateMachineExecution", {
+      ruleName: "S3TriggerStateMachineExecution",
+      eventPattern: {
+        source: ["aws.s3"],
+        detailType: ["Object Created"],
+        detail: {
+          bucket: { name: [s3Bucket.bucketName] },
+          object: { key: [{ prefix: "documents/" }] },
+        },
+      },
+      targets: [new targets.SfnStateMachine(readformeStateMachine)],
     });
   }
 }
