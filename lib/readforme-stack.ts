@@ -254,6 +254,12 @@ export class ReadformeStack extends Stack {
       getLambdaFunctionProps("detectDominantLanguage", detectDominantLanguageLambdaRole, undefined, {})
     );
 
+    const getVoiceIdLambda = new lambda.Function(
+      this,
+      "GetVoiceId",
+      getLambdaFunctionProps("getVoiceId", undefined, undefined, {})
+    );
+
     const cleanupTopicAndQueueLambda = new lambda.Function(
       this,
       "CleanupTopicAndQueue",
@@ -319,6 +325,13 @@ export class ReadformeStack extends Stack {
       resultPath: "$.detectDominantLanguageResult",
     });
 
+    const getVoiceIdTask = new tasks.LambdaInvoke(this, "Get Voice Id", {
+      lambdaFunction: getVoiceIdLambda,
+      inputPath: "$.detectDominantLanguageResult",
+      resultSelector: { "VoiceId.$": "$.Payload" },
+      resultPath: "$.getVoiceIdResult",
+    });
+
     const documentTooLargeFailTask = new sfn.Fail(this, "Fail: Document Too Large", {
       error: "DocumentTooLarge",
       cause: "Size limit is 5MB!",
@@ -357,6 +370,7 @@ export class ReadformeStack extends Stack {
                 })
               )
               .next(detectDominantLanguageTask)
+              .next(getVoiceIdTask)
               .next(cleanupTopicAndQueueTask1)
           )
       );
