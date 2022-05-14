@@ -35,14 +35,13 @@ export class ReadformeStack extends Stack {
         statements: [
           new iam.PolicyStatement({
             effect: iam.Effect.ALLOW,
-            actions: [
-              "sns:CreateTopic",
-              "sns:Subscribe",
-              "sqs:CreateQueue",
-              "sqs:GetQueueAttributes",
-              "sqs:SetQueueAttributes",
-            ],
-            resources: [SNS_TOPIC_ARN, SQS_QUEUE_ARN],
+            actions: ["sns:CreateTopic", "sns:Subscribe"],
+            resources: [SNS_TOPIC_ARN],
+          }),
+          new iam.PolicyStatement({
+            effect: iam.Effect.ALLOW,
+            actions: ["sqs:CreateQueue", "sqs:GetQueueAttributes", "sqs:SetQueueAttributes"],
+            resources: [SQS_QUEUE_ARN],
           }),
         ],
       }
@@ -112,13 +111,13 @@ export class ReadformeStack extends Stack {
         }),
         new iam.PolicyStatement({
           effect: iam.Effect.ALLOW,
-          actions: ["sqs:ReceiveMessage", "sqs:DeleteMessage"],
-          resources: [SQS_QUEUE_ARN],
+          actions: ["sns:Publish"],
+          resources: [SNS_TOPIC_ARN],
         }),
         new iam.PolicyStatement({
           effect: iam.Effect.ALLOW,
-          actions: ["sns:Publish"],
-          resources: [SNS_TOPIC_ARN],
+          actions: ["sqs:ReceiveMessage", "sqs:DeleteMessage"],
+          resources: [SQS_QUEUE_ARN],
         }),
       ],
     });
