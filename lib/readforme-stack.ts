@@ -1,4 +1,4 @@
-import { Stack, StackProps, Duration } from "aws-cdk-lib";
+import { Stack, StackProps, Duration, CfnOutput } from "aws-cdk-lib";
 import { Construct } from "constructs";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as s3 from "aws-cdk-lib/aws-s3";
@@ -417,6 +417,18 @@ export class ReadformeStack extends Stack {
         },
       },
       targets: [new targets.SfnStateMachine(readformeStateMachine)],
+    });
+
+    /** ------------------ Outputs Definition ------------------ */
+
+    new CfnOutput(this, "ReadForMeStateMachineArn", {
+      value: readformeStateMachine.stateMachineArn,
+      description: "ReadForMe State Machine Arn",
+    });
+
+    new CfnOutput(this, "S3BucketName", {
+      value: s3Bucket.bucketName,
+      description: "S3 Bucket Name",
     });
   }
 }
