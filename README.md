@@ -31,11 +31,14 @@ This project creates a AWS StepFunctions State Machine that will read a text fil
         - 2.2.6.1.5: `Delete Polly Task Message`: Delete AWS Polly task status message from the SQS Queue.
         - 2.2.6.1.6: `Get Speech Synthesis`: Call to AWS Polly GetSpeechSynthesisTask API to retrieve the information about the synthesis task.
         - 2.2.6.1.7: `Cleanup Topic And Queue 2`: Invoke CleanupTopicAndQueue Lambda which deletes the SNS Topic, SQS Queue and subscription between them.
+        - 2.2.6.1.8: `End`
       - 2.2.6.2: `Cleanup Topic And Queue 1`: Invoke CleanupTopicAndQueue Lambda which deletes the SNS Topic, SQS Queue and subscription between them.
         - 2.2.6.2.1: `Fail: No Text Found`: Fail state when no text is found in the document.
+        - 2.2.6.2.2: `End`
   - 2.2 `Fail: Document Too Large`: Fail state when the document is too large (max: 5MB).
+    - 2.2.1: `End`
   - 2.3 `Fail: Unsupported Document`: Fail state when the document extension is not supported (supported formats: PDF, PNG, JPG, JPEG and TIFF).
-- 3 `End`
+    - 2.3.1: `End`
 
 ## Bootstrap
 
