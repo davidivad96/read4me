@@ -44,6 +44,8 @@ If it's the first time you use CDK in your account it's probably that you need t
 
 Run `npm run cdk-deploy <aws-profile> <account-id> <region>`. This will deploy / redeploy your Stack to your AWS Account.
 
+After the deployment you will see two outputs: the State Machine ARN and the S3 Bucket name. Use this to easily find your resources.
+
 ## Destroy
 
 Just run `npm run cdk-destroy <aws-profile> <account-id> <region>`. This will destroy your Stack.
