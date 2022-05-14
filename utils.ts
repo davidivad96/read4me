@@ -18,3 +18,6 @@ export const getLambdaFunctionProps = (
     ...environment,
   },
 });
+
+export const getRandom = () =>
+  Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);

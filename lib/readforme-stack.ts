@@ -1,4 +1,4 @@
-import { Stack, StackProps, Duration, RemovalPolicy } from "aws-cdk-lib";
+import { Stack, StackProps, Duration } from "aws-cdk-lib";
 import { Construct } from "constructs";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as s3 from "aws-cdk-lib/aws-s3";
@@ -7,7 +7,10 @@ import * as targets from "aws-cdk-lib/aws-events-targets";
 import * as sfn from "aws-cdk-lib/aws-stepfunctions";
 import * as tasks from "aws-cdk-lib/aws-stepfunctions-tasks";
 import * as lambda from "aws-cdk-lib/aws-lambda";
-import { getLambdaFunctionProps } from "../utils";
+import { getLambdaFunctionProps, getRandom } from "../utils";
+
+const SQS_QUEUE_ARN = `arn:aws:sqs:${process.env.CDK_DEPLOY_REGION}:${process.env.CDK_DEPLOY_ACCOUNT}:ReadformeJob_*`;
+const SNS_TOPIC_ARN = `arn:aws:sns:${process.env.CDK_DEPLOY_REGION}:${process.env.CDK_DEPLOY_ACCOUNT}:ReadformeJob_*`;
 
 export class ReadformeStack extends Stack {
   constructor(scope: Construct, id: string, props?: StackProps) {
@@ -15,8 +18,7 @@ export class ReadformeStack extends Stack {
 
     /** ------------------ Bucket Definition ------------------ */
 
-    const random =
-      Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    const random = getRandom();
     const bucketName = `readforme-${random}`;
     const s3Bucket = new s3.Bucket(this, bucketName, {
       bucketName,
@@ -40,10 +42,7 @@ export class ReadformeStack extends Stack {
               "sqs:GetQueueAttributes",
               "sqs:SetQueueAttributes",
             ],
-            resources: [
-              `arn:aws:sns:${process.env.CDK_DEPLOY_REGION}:${process.env.CDK_DEPLOY_ACCOUNT}:ReadformeJob_*`,
-              `arn:aws:sqs:${process.env.CDK_DEPLOY_REGION}:${process.env.CDK_DEPLOY_ACCOUNT}:ReadformeJob_*`,
-            ],
+            resources: [SNS_TOPIC_ARN, SQS_QUEUE_ARN],
           }),
         ],
       }
@@ -55,7 +54,6 @@ export class ReadformeStack extends Stack {
         iam.ManagedPolicy.fromAwsManagedPolicyName("service-role/AWSLambdaBasicExecutionRole"),
         setupTopicAndQueueLambdaPolicy,
       ],
-      roleName: "SetupTopicAndQueueLambdaRole",
     });
 
     const textractSNSPublishPolicy = new iam.ManagedPolicy(this, "TextractSNSPublishPolicy", {
@@ -63,9 +61,7 @@ export class ReadformeStack extends Stack {
         new iam.PolicyStatement({
           effect: iam.Effect.ALLOW,
           actions: ["sns:Publish"],
-          resources: [
-            `arn:aws:sns:${process.env.CDK_DEPLOY_REGION}:${process.env.CDK_DEPLOY_ACCOUNT}:ReadformeJob_*`,
-          ],
+          resources: [SNS_TOPIC_ARN],
         }),
       ],
     });
@@ -73,7 +69,6 @@ export class ReadformeStack extends Stack {
     const textractSNSPublishRole = new iam.Role(this, "TextractSNSPublishRole", {
       assumedBy: new iam.ServicePrincipal("textract.amazonaws.com"),
       managedPolicies: [textractSNSPublishPolicy],
-      roleName: "TextractSNSPublishRole",
     });
 
     const cleanupTopicAndQueueLambdaPolicy = new iam.ManagedPolicy(
@@ -89,10 +84,7 @@ export class ReadformeStack extends Stack {
           new iam.PolicyStatement({
             effect: iam.Effect.ALLOW,
             actions: ["sns:DeleteTopic", "sqs:DeleteQueue"],
-            resources: [
-              `arn:aws:sns:${process.env.CDK_DEPLOY_REGION}:${process.env.CDK_DEPLOY_ACCOUNT}:ReadformeJob_*`,
-              `arn:aws:sqs:${process.env.CDK_DEPLOY_REGION}:${process.env.CDK_DEPLOY_ACCOUNT}:ReadformeJob_*`,
-            ],
+            resources: [SNS_TOPIC_ARN, SQS_QUEUE_ARN],
           }),
         ],
       }
@@ -104,7 +96,6 @@ export class ReadformeStack extends Stack {
         iam.ManagedPolicy.fromAwsManagedPolicyName("service-role/AWSLambdaBasicExecutionRole"),
         cleanupTopicAndQueueLambdaPolicy,
       ],
-      roleName: "CleanupTopicAndQueueLambdaRole",
     });
 
     const readformeStateMachinePolicy = new iam.ManagedPolicy(this, "ReadformeStateMachinePolicy", {
@@ -122,16 +113,12 @@ export class ReadformeStack extends Stack {
         new iam.PolicyStatement({
           effect: iam.Effect.ALLOW,
           actions: ["sqs:ReceiveMessage", "sqs:DeleteMessage"],
-          resources: [
-            `arn:aws:sqs:${process.env.CDK_DEPLOY_REGION}:${process.env.CDK_DEPLOY_ACCOUNT}:ReadformeJob_*`,
-          ],
+          resources: [SQS_QUEUE_ARN],
         }),
         new iam.PolicyStatement({
           effect: iam.Effect.ALLOW,
           actions: ["sns:Publish"],
-          resources: [
-            `arn:aws:sns:${process.env.CDK_DEPLOY_REGION}:${process.env.CDK_DEPLOY_ACCOUNT}:ReadformeJob_*`,
-          ],
+          resources: [SNS_TOPIC_ARN],
         }),
       ],
     });
@@ -227,9 +214,7 @@ export class ReadformeStack extends Stack {
         action: "receiveMessage",
         parameters: { QueueUrl: sfn.JsonPath.stringAt("$.queueUrl") },
         resultPath: "$.receiveTextractJobMessageResult",
-        iamResources: [
-          `arn:aws:sqs:${process.env.CDK_DEPLOY_REGION}:${process.env.CDK_DEPLOY_ACCOUNT}:ReadformeJob_*`,
-        ],
+        iamResources: [SQS_QUEUE_ARN],
       }
     );
 
@@ -251,9 +236,7 @@ export class ReadformeStack extends Stack {
           ),
         },
         resultPath: sfn.JsonPath.DISCARD,
-        iamResources: [
-          `arn:aws:sqs:${process.env.CDK_DEPLOY_REGION}:${process.env.CDK_DEPLOY_ACCOUNT}:ReadformeJob_*`,
-        ],
+        iamResources: [SQS_QUEUE_ARN],
       }
     );
 
@@ -292,9 +275,7 @@ export class ReadformeStack extends Stack {
     const detectDominantLanguageTask = new tasks.CallAwsService(this, "Detect Dominant Language", {
       service: "comprehend",
       action: "detectDominantLanguage",
-      parameters: {
-        Text: sfn.JsonPath.stringAt("$.Text"),
-      },
+      parameters: { Text: sfn.JsonPath.stringAt("$.Text") },
       inputPath: "$.getDocumentTextDetectionResult",
       resultSelector: { "LanguageCode.$": "$.Languages[0].LanguageCode" },
       resultPath: "$.detectDominantLanguageResult",
@@ -332,9 +313,7 @@ export class ReadformeStack extends Stack {
         action: "receiveMessage",
         parameters: { QueueUrl: sfn.JsonPath.stringAt("$.queueUrl") },
         resultPath: "$.receivePollyTaskMessageResult",
-        iamResources: [
-          `arn:aws:sqs:${process.env.CDK_DEPLOY_REGION}:${process.env.CDK_DEPLOY_ACCOUNT}:ReadformeJob_*`,
-        ],
+        iamResources: [SQS_QUEUE_ARN],
       }
     );
 
@@ -353,17 +332,13 @@ export class ReadformeStack extends Stack {
         ),
       },
       resultPath: sfn.JsonPath.DISCARD,
-      iamResources: [
-        `arn:aws:sqs:${process.env.CDK_DEPLOY_REGION}:${process.env.CDK_DEPLOY_ACCOUNT}:ReadformeJob_*`,
-      ],
+      iamResources: [SQS_QUEUE_ARN],
     });
 
     const getSpeechSynthesisTask = new tasks.CallAwsService(this, "Get Speech Synthesis", {
       service: "polly",
       action: "getSpeechSynthesisTask",
-      parameters: {
-        TaskId: sfn.JsonPath.stringAt("$.TaskId"),
-      },
+      parameters: { TaskId: sfn.JsonPath.stringAt("$.TaskId") },
       inputPath: "$.startSpeechSynthesisTaskResult",
       resultPath: "$.getSpeechSynthesisTaskResult",
       iamResources: ["*"],
