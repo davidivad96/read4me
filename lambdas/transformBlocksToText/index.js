@@ -1,7 +1,3 @@
-import { TextractClient, GetDocumentTextDetectionCommand } from "@aws-sdk/client-textract";
-
-const textractClient = new TextractClient({ region: process.env.CDK_DEPLOY_REGION });
-
 class NoTextFound extends Error {
   constructor(message) {
     super(message);
@@ -10,12 +6,7 @@ class NoTextFound extends Error {
 }
 
 const handler = async (event) => {
-  const { Blocks } = await textractClient.send(
-    new GetDocumentTextDetectionCommand({
-      JobId: event.JobId,
-    })
-  );
-  const text = Blocks.reduce(
+  const text = event.Blocks.reduce(
     (acc, curr) => (curr.BlockType === "LINE" && curr.Text ? `${acc.concat(curr.Text)} ` : acc),
     ""
   );

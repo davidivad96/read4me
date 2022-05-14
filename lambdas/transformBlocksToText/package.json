@@ -1,5 +1,5 @@
 {
-  "name": "receivesqsmessage",
+  "name": "transformblockstotext",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
@@ -8,8 +8,5 @@
   },
   "author": "",
   "license": "ISC",
-  "dependencies": {
-    "@aws-sdk/client-sqs": "^3.87.0"
-  },
   "type": "module"
 }
