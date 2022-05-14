@@ -133,31 +133,31 @@ export class ReadformeStack extends Stack {
     const checkDocumentLambda = new lambda.Function(
       this,
       "CheckDocument",
-      getLambdaFunctionProps("checkDocument", undefined, undefined, {})
+      getLambdaFunctionProps("checkDocument")
     );
 
     const setupTopicAndQueueLambda = new lambda.Function(
       this,
       "SetupTopicAndQueue",
-      getLambdaFunctionProps("setupTopicAndQueue", setupTopicAndQueueLambdaRole, undefined, {})
+      getLambdaFunctionProps("setupTopicAndQueue", setupTopicAndQueueLambdaRole)
     );
 
     const transformBlocksToTextLambda = new lambda.Function(
       this,
       "TransformBlocksToText",
-      getLambdaFunctionProps("transformBlocksToText", undefined, undefined, {})
+      getLambdaFunctionProps("transformBlocksToText")
     );
 
     const getVoiceIdLambda = new lambda.Function(
       this,
       "GetVoiceId",
-      getLambdaFunctionProps("getVoiceId", undefined, undefined, {})
+      getLambdaFunctionProps("getVoiceId")
     );
 
     const cleanupTopicAndQueueLambda = new lambda.Function(
       this,
       "CleanupTopicAndQueue",
-      getLambdaFunctionProps("cleanupTopicAndQueue", cleanupTopicAndQueueLambdaRole, undefined, {})
+      getLambdaFunctionProps("cleanupTopicAndQueue", cleanupTopicAndQueueLambdaRole)
     );
 
     /** ------------------ Tasks and States Definition ------------------ */
@@ -246,9 +246,7 @@ export class ReadformeStack extends Stack {
       {
         service: "textract",
         action: "getDocumentTextDetection",
-        parameters: {
-          JobId: sfn.JsonPath.stringAt("$.JobId"),
-        },
+        parameters: { JobId: sfn.JsonPath.stringAt("$.JobId") },
         inputPath: "$.startDocumentTextDetectionResult",
         resultPath: "$.getDocumentTextDetectionResult",
         iamResources: ["*"],
