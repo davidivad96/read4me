@@ -2,8 +2,6 @@ import { Stack, StackProps, Duration, CfnOutput } from "aws-cdk-lib";
 import { Construct } from "constructs";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as s3 from "aws-cdk-lib/aws-s3";
-import * as eventbridge from "aws-cdk-lib/aws-events";
-import * as targets from "aws-cdk-lib/aws-events-targets";
 import * as sfn from "aws-cdk-lib/aws-stepfunctions";
 import * as tasks from "aws-cdk-lib/aws-stepfunctions-tasks";
 import * as lambda from "aws-cdk-lib/aws-lambda";
@@ -21,7 +19,10 @@ export class ReadformeStack extends Stack {
     const s3Bucket = new s3.Bucket(this, bucketName, {
       bucketName,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
-      eventBridgeEnabled: true,
+      // TODO: allow only deployed frontend
+      cors: [
+        { allowedOrigins: ["*"], allowedHeaders: ["*"], allowedMethods: [s3.HttpMethods.PUT] },
+      ],
     });
 
     /** ------------------ Roles, Policies and Permissions Definition ------------------ */
@@ -39,7 +40,7 @@ export class ReadformeStack extends Stack {
           new iam.PolicyStatement({
             effect: iam.Effect.ALLOW,
             actions: ["s3:GetObject", "s3:PutObject"],
-            resources: [`${s3Bucket.bucketArn}/results/*`],
+            resources: [`${s3Bucket.bucketArn}/audios/*`],
           }),
         ],
       }
@@ -72,7 +73,7 @@ export class ReadformeStack extends Stack {
 
     const parseTextLambda = new lambda.Function(
       this,
-      "ParseTextLambda",
+      "ParseText",
       getLambdaFunctionProps("parseText")
     );
 
@@ -96,12 +97,11 @@ export class ReadformeStack extends Stack {
       parameters: {
         Document: {
           S3Object: {
-            Bucket: sfn.JsonPath.stringAt("$.bucket.name"),
-            Name: sfn.JsonPath.stringAt("$.object.key"),
+            Bucket: sfn.JsonPath.stringAt("$.bucketName"),
+            Name: sfn.JsonPath.stringAt("$.objectKey"),
           },
         },
       },
-      inputPath: "$.detail",
       resultPath: "$.detectDocumentTextResult",
       iamResources: ["*"],
     });
@@ -136,7 +136,7 @@ export class ReadformeStack extends Stack {
       resultPath: "$.synthesizeSpeechResult",
     });
 
-    /** ------------------ Step Function Definition ------------------ */
+    /** ------------------ StepFunctions State Machine Definition ------------------ */
 
     const definition = detectDocumentTextTask
       .next(parseTextTask)
@@ -144,7 +144,7 @@ export class ReadformeStack extends Stack {
       .next(getVoiceIdTask)
       .next(synthesizeSpeechTask);
 
-    const readformeStateMachine = new sfn.StateMachine(this, "ReadForMe", {
+    const readformeStateMachine = new sfn.StateMachine(this, "ReadForMeStateMachine", {
       definition,
       timeout: Duration.minutes(5),
       stateMachineName: "ReadForMe",
@@ -152,35 +152,20 @@ export class ReadformeStack extends Stack {
       tracingEnabled: true,
       role: readformeStateMachineRole,
       logs: {
-        destination: new logs.LogGroup(this, "ReadForMeLogGroup"),
+        destination: new logs.LogGroup(this, "ReadForMeStateMachineLogGroup"),
         includeExecutionData: true,
         level: sfn.LogLevel.ALL,
       },
     });
 
-    /** ------------------ EventBridge Rule Definition ------------------ */
-
-    new eventbridge.Rule(this, "S3TriggerStateMachineExecution", {
-      ruleName: "S3TriggerStateMachineExecution",
-      eventPattern: {
-        source: ["aws.s3"],
-        detailType: ["Object Created"],
-        detail: {
-          bucket: { name: [s3Bucket.bucketName] },
-          object: { key: [{ prefix: "documents/" }] },
-        },
-      },
-      targets: [new targets.SfnStateMachine(readformeStateMachine)],
-    });
-
     /** ------------------ Outputs Definition ------------------ */
 
-    new CfnOutput(this, "ReadForMeStateMachineArn", {
+    new CfnOutput(this, "ReadForMeStateMachineArnOutput", {
       value: readformeStateMachine.stateMachineArn,
       description: "ReadForMe State Machine Arn",
     });
 
-    new CfnOutput(this, "S3BucketName", {
+    new CfnOutput(this, "S3BucketNameOutput", {
       value: s3Bucket.bucketName,
       description: "S3 Bucket Name",
     });
