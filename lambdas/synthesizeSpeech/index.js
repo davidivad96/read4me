@@ -14,12 +14,11 @@ const handler = async (event) => {
       VoiceId: event.getVoiceIdResult.VoiceId,
     })
   );
-  const Bucket = event.detail.bucket.name;
-  const filename = event.detail.object.key
+  const Bucket = event.bucketName;
+  const Key = `audios/${event.objectKey
     .replace("documents/", "")
     .toLowerCase()
-    .replace(/[^a-zA-Z\d]/g, "_");
-  const Key = `results/${filename}.mp3`;
+    .replace(/[^a-zA-Z\d]/g, "_")}.mp3`;
   const upload = new Upload({
     client: s3Client,
     params: { Body: AudioStream, Bucket, Key },
