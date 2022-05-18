@@ -55,3 +55,7 @@ Then you can go to your StepFunctions state machine console and click on "Start 
 ```
 
 You can see how the state machine execution is triggered and check the logs in the associated CloudWatch Log Group. After less than 1 minute the state machine will finish and the audio file will be available in your S3 Bucket /audios folder.
+
+## Supported file types
+
+Only PNG, JPG and JPEG documents are allowed. These are the ones supported by AWS Textract synchronous API.
