@@ -3,6 +3,7 @@ import { S3Client, PutObjectCommand, S3ServiceException } from "@aws-sdk/client-
 import { SFNClient, StartSyncExecutionCommand, SFNServiceException } from "@aws-sdk/client-sfn";
 import { FileUploader } from "react-drag-drop-files";
 import ReactAudioPlayer from "react-audio-player";
+import Spinner from "./components/Spinner";
 import "./App.css";
 
 const bucketName = process.env.REACT_APP_BUCKET_NAME;
@@ -56,7 +57,12 @@ const App = () => {
           stateMachineArn: "arn:aws:states:us-east-1:138804335442:stateMachine:ReadForMe",
         })
       );
-      setStatus(sfnStatus === "SUCCEEDED" ? "COMPLETED" : "ERROR");
+      if (sfnStatus === "FAILED" || sfnStatus === "TIMED_OUT" || sfnStatus === "ABORTED") {
+        setStatus("ERROR");
+        setErrorMsg(error);
+        return;
+      }
+      setStatus("COMPLETED");
       const {
         detectDocumentTextResult: { Text },
         synthesizeSpeechResult: { SignedUrl },
@@ -65,6 +71,7 @@ const App = () => {
       setAudioUrl(SignedUrl);
       setErrorMsg(error);
     } catch (error) {
+      console.log(error);
       setStatus("ERROR");
       setErrorMsg(
         error instanceof S3ServiceException || error instanceof SFNServiceException
@@ -82,8 +89,7 @@ const App = () => {
       <div className="App-body">
         <div className="App-content">
           <h3 className="App-subtitle">
-            Select a document that contains text and you'll be able to hear it in a couple of
-            seconds!
+            Select a document that contains text and you'll be able to hear it in a few seconds!
           </h3>
           <FileUploader
             classes="file-uploader"
@@ -99,9 +105,9 @@ const App = () => {
             Submit!
           </button>
           {status === "UPLOADING" || status === "PROCESSING" ? (
-            <p>{status}...</p>
+            <Spinner />
           ) : status === "ERROR" ? (
-            <p className="status-error">{errorMsg}</p>
+            <p className="status-error">Error: {errorMsg}</p>
           ) : status === "COMPLETED" ? (
             <>
               <p className="status-success">Completed</p>
