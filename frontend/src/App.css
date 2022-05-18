@@ -1,0 +1,63 @@
+.App {
+  text-align: center;
+}
+
+.App-header {
+  display: flex;
+  flex: 1;
+  justify-content: center;
+  align-items: center;
+  background-color: #ef8a4f;
+  height: 100px;
+}
+
+.App-title {
+  color: #22487e;
+}
+
+.App-subtitle {
+  color: #ef8a4f;
+}
+
+.App-body {
+  background-color: #22487e;
+  min-height: calc(100vh - 100px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  font-size: calc(10px + 2vmin);
+  color: white;
+  padding: 0 30px;
+}
+.App-content {
+  max-width: 500px;
+  margin-top: 100px;
+}
+
+.App-button {
+  margin-top: 20px;
+  padding: 12px;
+  border-radius: 6px;
+  background-color: #ef8a4f;
+  color: #22487e;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.App-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.status-success {
+  color: green;
+}
+
+.status-error {
+  color: red;
+}
+
+.file-uploader {
+  background-color: #c8c8c8;
+}
