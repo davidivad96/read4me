@@ -91,7 +91,7 @@ export class ReadformeStack extends Stack {
 
     /** ------------------ Tasks Definition ------------------ */
 
-    const detectDocumentTextTask = new tasks.CallAwsService(this, "DetectDocumentTextTask", {
+    const detectDocumentTextTask = new tasks.CallAwsService(this, "Detect Document Text", {
       service: "textract",
       action: "detectDocumentText",
       parameters: {
