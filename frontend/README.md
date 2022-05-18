@@ -8,6 +8,7 @@ There is a `.env.example` file in the root of the project. Copy it to `.env` and
 
 ```
 REACT_APP_BUCKET_NAME=
+REACT_APP_STATE_MACHINE_ARN
 REACT_APP_AWS_REGION=
 REACT_APP_AWS_ACCESS_KEY_ID=
 REACT_APP_AWS_SECRET_ACCESS_KEY=

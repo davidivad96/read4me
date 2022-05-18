@@ -7,6 +7,7 @@ import Spinner from "./components/Spinner";
 import "./App.css";
 
 const bucketName = process.env.REACT_APP_BUCKET_NAME;
+const stateMachineArn = process.env.REACT_APP_STATE_MACHINE_ARN;
 const fileTypes = ["PNG", "JPG", "JPEG"];
 
 const s3Client = new S3Client({
@@ -53,7 +54,7 @@ const App = () => {
       } = await sfnClient.send(
         new StartSyncExecutionCommand({
           input: JSON.stringify({ bucketName, objectKey }),
-          stateMachineArn: "arn:aws:states:us-east-1:138804335442:stateMachine:ReadForMe",
+          stateMachineArn,
         })
       );
       if (sfnStatus === "FAILED" || sfnStatus === "TIMED_OUT" || sfnStatus === "ABORTED") {
