@@ -24,7 +24,7 @@ const sfnClient = new SFNClient({
   },
 });
 
-type Status = "UPLOADING" | "PROCESSING" | "COMPLETED" | "ERROR";
+type Status = "PROCESSING" | "COMPLETED" | "ERROR";
 
 const App = () => {
   const [file, setFile] = useState<File | null>(null);
@@ -37,7 +37,7 @@ const App = () => {
 
   const handleSubmit = async () => {
     try {
-      setStatus("UPLOADING");
+      setStatus("PROCESSING");
       const objectKey = `documents/${file!.name}`;
       await s3Client.send(
         new PutObjectCommand({
@@ -46,7 +46,6 @@ const App = () => {
           Body: file!,
         })
       );
-      setStatus("PROCESSING");
       const {
         status: sfnStatus,
         error,
@@ -100,11 +99,11 @@ const App = () => {
           <button
             className="App-button"
             onClick={handleSubmit}
-            disabled={!file || status === "UPLOADING" || status === "PROCESSING"}
+            disabled={!file || status === "PROCESSING"}
           >
             Submit!
           </button>
-          {status === "UPLOADING" || status === "PROCESSING" ? (
+          {status === "PROCESSING" ? (
             <Spinner />
           ) : status === "ERROR" ? (
             <p className="status-error">Error: {errorMsg}</p>
