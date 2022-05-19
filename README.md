@@ -28,6 +28,10 @@ This project creates a AWS StepFunctions Express State Machine that will read a 
 
 If it's the first time you use CDK in your account it's probably that you need to bootstrap your environment before deploying your Stack. Just run run `npm run cdk-bootstrap <aws-profile> <account-id> <region>`. This will create the necessary resources for you to deploy your Stack.
 
+## Install dependencies
+
+Run `npm install` in the root of the project. Also run it in the "lambda/synthesizeSpeech" folder to install the dependencies of the Lambda function.
+
 ## Deploy
 
 Run `npm run cdk-deploy <aws-profile> <account-id> <region>`. This will deploy / redeploy your Stack to your AWS Account.
@@ -58,4 +62,4 @@ You can see how the state machine execution is triggered and check the logs in t
 
 ## Supported file types
 
-Only PNG, JPG and JPEG documents are allowed. These are the ones supported by AWS Textract synchronous API.
+Only PDF, PNG, JPG and JPEG documents are supported. PDFs are allowed only 1 page.
