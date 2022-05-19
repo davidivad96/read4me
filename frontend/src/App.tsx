@@ -30,9 +30,9 @@ type Status = "PROCESSING" | "COMPLETED" | "ERROR";
 const App = () => {
   const [file, setFile] = useState<File | null>(null);
   const [status, setStatus] = useState<Status | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | undefined>();
   const [text, setText] = useState<string | undefined>();
   const [audioUrl, setAudioUrl] = useState<string | undefined>();
-  const [errorMsg, setErrorMsg] = useState<string | undefined>();
 
   const handleChange = (file: File) => setFile(file);
 
