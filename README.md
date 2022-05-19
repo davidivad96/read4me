@@ -63,3 +63,7 @@ You can see how the state machine execution is triggered and check the logs in t
 ## Supported file types
 
 Only PDF, PNG, JPG and JPEG documents are supported. PDFs are allowed only 1 page.
+
+## Hashnode post
+
+https://davidivad96.hashnode.dev/leverage-aws-services-and-cdk-to-build-an-amazing-read4me-app
