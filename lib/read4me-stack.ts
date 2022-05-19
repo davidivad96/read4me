@@ -21,6 +21,7 @@ export class Read4meStack extends Stack {
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       cors: [
         {
+          // Replace this with your domain or * to allow all origins
           allowedOrigins: ["https://read4meapp.com"],
           allowedHeaders: ["*"],
           allowedMethods: [s3.HttpMethods.PUT],
