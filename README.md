@@ -1,4 +1,4 @@
-# ReadForMe CDK Stack
+# Read4Me CDK Stack
 
 ![Stability: Stable](https://img.shields.io/badge/stability-Stable-success.svg?style=for-the-badge)
 

@@ -1,4 +1,4 @@
-# Frontend for the ReadForMe backend
+# Frontend for the Read4Me backend
 
 Simple web app where you can upload a document with text (supported formats: PDF, JPG and JPEG) and this will be converted to speech and reproduced in your browser.
 
@@ -14,7 +14,7 @@ REACT_APP_AWS_ACCESS_KEY_ID=
 REACT_APP_AWS_SECRET_ACCESS_KEY=
 ```
 
-You need to have deployed the ReadForMe CDK Stack first (also available in this repository, read its README.md to know how to deploy it). After that you can fill the env variables and run the app.
+You need to have deployed the Read4Me CDK Stack first (also available in this repository, read its README.md to know how to deploy it). Also make sure to use access keys credentials of an IAM user with the sufficient permissions. After that you can fill the env variables and run the app.
 
 ## Available Scripts
 

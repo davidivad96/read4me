@@ -8,20 +8,23 @@ import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as logs from "aws-cdk-lib/aws-logs";
 import { getLambdaFunctionProps, getRandom } from "../utils";
 
-export class ReadformeStack extends Stack {
+export class Read4meStack extends Stack {
   constructor(scope: Construct, id: string, props?: StackProps) {
     super(scope, id, props);
 
     /** ------------------ Bucket Definition ------------------ */
 
     const random = getRandom();
-    const bucketName = `readforme-${random}`;
+    const bucketName = `read4me-${random}`;
     const s3Bucket = new s3.Bucket(this, bucketName, {
       bucketName,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
-      // TODO: allow only deployed frontend
       cors: [
-        { allowedOrigins: ["*"], allowedHeaders: ["*"], allowedMethods: [s3.HttpMethods.PUT] },
+        {
+          allowedOrigins: ["read4meapp.com"],
+          allowedHeaders: ["*"],
+          allowedMethods: [s3.HttpMethods.PUT],
+        },
       ],
     });
 
@@ -54,7 +57,7 @@ export class ReadformeStack extends Stack {
       ],
     });
 
-    const readformeStateMachinePolicy = new iam.ManagedPolicy(this, "ReadformeStateMachinePolicy", {
+    const read4meStateMachinePolicy = new iam.ManagedPolicy(this, "Read4meStateMachinePolicy", {
       statements: [
         new iam.PolicyStatement({
           effect: iam.Effect.ALLOW,
@@ -64,9 +67,9 @@ export class ReadformeStack extends Stack {
       ],
     });
 
-    const readformeStateMachineRole = new iam.Role(this, "ReadFormeStateMachineRole", {
+    const read4meStateMachineRole = new iam.Role(this, "Read4meStateMachineRole", {
       assumedBy: new iam.ServicePrincipal("states.amazonaws.com"),
-      managedPolicies: [readformeStateMachinePolicy],
+      managedPolicies: [read4meStateMachinePolicy],
     });
 
     /** ------------------ Lambda Handlers Definition ------------------ */
@@ -144,15 +147,15 @@ export class ReadformeStack extends Stack {
       .next(getVoiceIdTask)
       .next(synthesizeSpeechTask);
 
-    const readformeStateMachine = new sfn.StateMachine(this, "ReadForMeStateMachine", {
+    const read4meStateMachine = new sfn.StateMachine(this, "Read4MeStateMachine", {
       definition,
       timeout: Duration.minutes(5),
-      stateMachineName: "ReadForMe",
+      stateMachineName: "Read4Me",
       stateMachineType: sfn.StateMachineType.EXPRESS,
       tracingEnabled: true,
-      role: readformeStateMachineRole,
+      role: read4meStateMachineRole,
       logs: {
-        destination: new logs.LogGroup(this, "ReadForMeStateMachineLogGroup"),
+        destination: new logs.LogGroup(this, "Read4MeStateMachineLogGroup"),
         includeExecutionData: true,
         level: sfn.LogLevel.ALL,
       },
@@ -160,9 +163,9 @@ export class ReadformeStack extends Stack {
 
     /** ------------------ Outputs Definition ------------------ */
 
-    new CfnOutput(this, "ReadForMeStateMachineArnOutput", {
-      value: readformeStateMachine.stateMachineArn,
-      description: "ReadForMe State Machine Arn",
+    new CfnOutput(this, "Read4MeStateMachineArnOutput", {
+      value: read4meStateMachine.stateMachineArn,
+      description: "Read4Me State Machine Arn",
     });
 
     new CfnOutput(this, "S3BucketNameOutput", {

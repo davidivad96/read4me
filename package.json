@@ -1,8 +1,8 @@
 {
-  "name": "readforme",
+  "name": "read4me",
   "version": "0.1.0",
   "bin": {
-    "readforme": "bin/readforme.js"
+    "read4me": "bin/read4me.js"
   },
   "scripts": {
     "build": "tsc",
