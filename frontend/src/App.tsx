@@ -8,7 +8,7 @@ import "./App.css";
 
 const bucketName = process.env.REACT_APP_BUCKET_NAME;
 const stateMachineArn = process.env.REACT_APP_STATE_MACHINE_ARN;
-const fileTypes = ["PNG", "JPG", "JPEG"];
+const fileTypes = ["PDF", "PNG", "JPG", "JPEG"];
 
 const s3Client = new S3Client({
   region: process.env.REACT_APP_AWS_REGION,
@@ -59,7 +59,9 @@ const App = () => {
       );
       if (sfnStatus === "FAILED" || sfnStatus === "TIMED_OUT" || sfnStatus === "ABORTED") {
         setStatus("ERROR");
-        setErrorMsg(error);
+        setErrorMsg(
+          error === "Textract.UnsupportedDocumentException" ? "PDFs have a limit of 1 page" : error
+        );
         return;
       }
       setStatus("COMPLETED");
@@ -69,7 +71,6 @@ const App = () => {
       } = JSON.parse(output!);
       setText(Text);
       setAudioUrl(SignedUrl);
-      setErrorMsg(error);
     } catch (error) {
       console.log(error);
       setStatus("ERROR");
@@ -96,6 +97,7 @@ const App = () => {
             handleChange={handleChange}
             name="file"
             types={fileTypes}
+            maxSize={10}
           />
           <button
             className="App-button"
