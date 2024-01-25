@@ -6,7 +6,7 @@ import * as sfn from "aws-cdk-lib/aws-stepfunctions";
 import * as tasks from "aws-cdk-lib/aws-stepfunctions-tasks";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as logs from "aws-cdk-lib/aws-logs";
-import { getLambdaFunctionProps, getRandom } from "../utils";
+import { getLambdaFunctionProps } from "../utils";
 
 export class Read4meStack extends Stack {
   constructor(scope: Construct, id: string, props?: StackProps) {
@@ -14,8 +14,7 @@ export class Read4meStack extends Stack {
 
     /** ------------------ Bucket Definition ------------------ */
 
-    const random = getRandom();
-    const bucketName = `read4me-${random}`;
+    const bucketName = "read4me-app-media-bucket";
     const s3Bucket = new s3.Bucket(this, bucketName, {
       bucketName,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
@@ -23,9 +22,9 @@ export class Read4meStack extends Stack {
         {
           // Replace this with your domain or * to allow all origins
           allowedOrigins: [
-            "https://main.dkzj57darqtkx.amplifyapp.com",
             "https://read4meapp.com",
             "https://www.read4meapp.com",
+            "https://main.dkzj57darqtkx.amplifyapp.com",
           ],
           allowedHeaders: ["*"],
           allowedMethods: [s3.HttpMethods.PUT],
