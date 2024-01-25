@@ -22,7 +22,11 @@ export class Read4meStack extends Stack {
       cors: [
         {
           // Replace this with your domain or * to allow all origins
-          allowedOrigins: ["https://read4meapp.com", "https://www.read4meapp.com"],
+          allowedOrigins: [
+            "https://read4meapp.com",
+            "https://www.read4meapp.com",
+            "https://main.dkzj57darqtkx.amplifyapp.com",
+          ],
           allowedHeaders: ["*"],
           allowedMethods: [s3.HttpMethods.PUT],
         },
